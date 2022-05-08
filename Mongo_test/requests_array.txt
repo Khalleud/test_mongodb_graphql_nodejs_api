@@ -1,0 +1,145 @@
+1. db.Booking.count()
+
+
+
+
+
+case ServicesComplementaires is an array
+
+2 db.Booking.aggregate( [
+  { $match: { PrixHT: { $exists : true, $ne: null },  TauxdeTVA: { $exists : true, $ne: null },  ServicesComplementaires: { $exists : true, $ne: null  }     }},
+  {$project: {PrixHT:1, servicesHT: {  $sum:{
+  $map: {
+                      "input": "$ServicesComplementaires",
+                      "as": "row",
+                      "in":  {$multiply: [ "$$row.Prix HT", "$$row.Quantite"  ]}}}}
+                  }
+              },
+  { $project : {Total : { '$add' : [ "$PrixHT", "$servicesHT" ] }}},
+  { $group: { _id: null, chiffre_affaire : {$sum: "$Total"}}}])
+
+
+
+
+
+
+
+median:
+3. db.Booking.aggregate( [
+  { $match: { PrixHT: { $exists : true, $ne: null },  TauxdeTVA: { $exists : true, $ne: null },  ServicesComplementaires: { $exists : true, $ne: null  }     }},
+  {$project: {PrixHT:1, servicesHT: {  $sum:{
+  $map: {
+                      "input": "$ServicesComplementaires",
+                      "as": "row",
+                      "in":  {$multiply: [ "$$row.Prix HT", "$$row.Quantite"  ]}}}}
+                  }
+              },
+  { $project : {Total : { '$add' : [ "$PrixHT", "$servicesHT" ] }}},
+  { $sort : { Total : 1 } },
+  {$group: { _id: "", totals: { $push: "$Total" } }},
+  {$project: {totals: 1, size: { "$size": [ "$totals" ]}}},
+  {$project: {totals: 1, size:1, isEven: { "$eq": [{ "$mod": ["$size", 2] }, 0 ] }, middlePoint: { "$trunc": { "$divide": ["$size", 2] } }}     } ,
+  {$project: {totals: 1,size: 1, isEven: 1, middlePoint: 1,  beginMiddle: { $subtract: [ "$middlePoint", 1] },endMiddle: "$middlePoint"  } },
+  {$project: {size: 1, totals: 1, middlePoint: 1, beginMiddle: 1, beginValue: { "$arrayElemAt": ["$totals", "$beginMiddle"] }, endValue: { "$arrayElemAt": ["$totals", "$endMiddle"] }, isEven: 1      }},
+  {$project: {size: 1, totals: 1, middlePoint: 1, beginMiddle: 1, beginValue: 1, endValue: 1, middleSum: { $add: ["$beginValue", "$endValue"] }, isEven: 1 } },
+  {$project: {size: 1, totals: 1, median: {$cond: {
+                                if: "$isEven",
+                                then: { $divide: ["$middleSum", 2] },
+                                 else:  { "$arrayElemAt": ["$totals", "$middlePoint"] }
+                                 }
+                                 }}}
+])
+
+
+mean:
+
+3.2 db.Booking.aggregate( [
+  { $match: { PrixHT: { $exists : true, $ne: null },  TauxdeTVA: { $exists : true, $ne: null },  ServicesComplementaires: { $exists : true, $ne: null  }     }},
+  {$project: {PrixHT:1, servicesHT: {  $sum:{
+  $map: {
+                      "input": "$ServicesComplementaires",
+                      "as": "row",
+                      "in":  {$multiply: [ "$$row.Prix HT", "$$row.Quantite"  ]}}}}
+                  }
+              },
+  { $project : {Total : { '$add' : [ "$PrixHT", "$servicesHT" ] }}},
+  {$group: { _id:null, avg: {$avg:"$Total"} }}
+
+  ])
+
+
+
+
+
+
+
+4.  db.Booking.aggregate( [
+  { $match: {   ServicesComplementaires: { $exists : true, $ne: null  }     }},
+  {$project: {PrixHT:1 , TotalQt : { $sum : {
+    $map: {
+                      "input": "$ServicesComplementaires",
+                      "as": "row",
+                      "in":   "$$row.Quantite"  } }}
+                  }
+              },
+  { $group: { _id: null, total:{ $sum: "$TotalQt" }  }}
+
+])
+
+
+
+5.  db.Booking.aggregate( [
+  { $match: {   ServicesComplementaires: { $exists : true, $ne: null  }     }},
+  {$project: {PrixHT:1 , TotalQt : { $sum : {
+    $map: {
+                      "input": "$ServicesComplementaires",
+                      "as": "row",
+                      "in":   "$$row.Quantite"  } }}
+                  }
+              },
+  { $group: { _id: null, avg: {$avg:"$TotalQt"}  }},
+
+
+])
+
+
+
+
+6. db.Booking.aggregate( [
+
+    { $project: { _id: 1, a: {$cond: [ {$ifNull: ['$ServicesComplementaires', false]}, 1, 0 ]}  }},
+
+    {$group: { _id: null, ratioAvec: {$avg: "$a"}}},
+
+    { $addFields: { ratioSans: { $subtract: [ 1, "$ratioAvec" ] }}}
+])
+
+
+7. db.Booking.aggregate( [
+  { $match: { PrixHT: { $exists : true, $ne: null },  TauxdeTVA: { $exists : true, $ne: null },  ServicesComplementaires: { $exists : true, $ne: null  }     }},
+  {$project: {PrixTTC: {"$add": [ "$PrixHT", { "$multiply" : ["$PrixHT", "$TauxdeTVA"] }]}, servicesTTC: { $add: [{$sum:{
+  $map: {
+                      "input": "$ServicesComplementaires",
+                      "as": "row",
+                      "in":  {$multiply: [ "$$row.Prix HT", "$$row.Quantite"  ]}}}} ,   {$sum:{
+                      $map: {
+                                          "input": "$ServicesComplementaires",
+                                          "as": "row",
+                                          "in":  "$$row.Prix HT"}}}]  }
+                  }
+              },
+  { $project : {Total : { '$add' : [ "$PrixTTC", "$servicesTTC" ] }}},
+  { $sort : { Total : 1 } },
+  {$group: { _id: "", totals: { $push: "$Total" } }},
+  {$project: {totals: 1, size: { "$size": [ "$totals" ]}}},
+  {$project: {totals: 1, size:1, isEven: { "$eq": [{ "$mod": ["$size", 2] }, 0 ] }, middlePoint: { "$trunc": { "$divide": ["$size", 2] } }}     } ,
+  {$project: {totals: 1,size: 1, isEven: 1, middlePoint: 1,  beginMiddle: { $subtract: [ "$middlePoint", 1] },endMiddle: "$middlePoint"  } },
+  {$project: {size: 1, totals: 1, middlePoint: 1, beginMiddle: 1, beginValue: { "$arrayElemAt": ["$totals", "$beginMiddle"] }, endValue: { "$arrayElemAt": ["$totals", "$endMiddle"] }, isEven: 1      }},
+  {$project: {size: 1, totals: 1, middlePoint: 1, beginMiddle: 1, beginValue: 1, endValue: 1, middleSum: { $add: ["$beginValue", "$endValue"] }, isEven: 1 } },
+  {$project: {size: 1, totals: 1, median: {$cond: {
+                                if: "$isEven",
+                                then: { $divide: ["$middleSum", 2] },
+                                 else:  { "$arrayElemAt": ["$totals", "$middlePoint"] }
+                                 }
+                                 }}}
+])
