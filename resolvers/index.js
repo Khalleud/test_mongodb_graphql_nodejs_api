@@ -1,19 +1,29 @@
 
+const {villes, departement} = require('../data/')
+
+
 const resolvers = {
   Query: {
-    books: () => books,
+
 
     ville (root, { nom }, context) {
-      return villes[0];
+    for (let item of villes) {
+       if (item.nom == nom)  return item;
+
+    }
     },
 
     departement(root, {numero}, context) {
-      return departement[0].villes;
+      //return departement[0].villes;
+      for (let item of departement) {
+       if (item.numero == numero)  return item.villes;
+
+      }
+
     }
 
 
   },
 };
-
 
 module.exports = resolvers;
